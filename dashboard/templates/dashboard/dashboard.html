@@ -1,0 +1,349 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    :root {
+        --bg-page: #f9f9f9;
+        --bg-card: #ffffff;
+        --text-primary: #333;
+        --text-secondary: #555;
+        --text-muted: #666;
+        --accent: #2a7ae2;
+        --border: #ddd;
+        --table-head: #f2f2f2;
+        --shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+        --radius: 10px;
+        --gap: 15px;
+        --space: 20px;
+    }
+
+    .dashboard-page {
+        background: var(--bg-page);
+        padding: 20px;
+        border-radius: 10px;
+    }
+
+    .dashboard-header h1 {
+        margin: 0 0 20px;
+        color: var(--text-primary);
+    }
+
+    .dashboard-section {
+        margin-top: 30px;
+    }
+
+    .card {
+        background: var(--bg-card);
+        padding: var(--space);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+    }
+
+    .section-title {
+        margin: 0 0 15px;
+        color: #444;
+    }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: var(--gap);
+    }
+
+    .kpi-box {
+        text-align: center;
+    }
+
+    .kpi-value {
+        margin: 0 0 10px;
+        font-size: 24px;
+        font-weight: bold;
+        color: var(--accent);
+        word-break: break-word;
+    }
+
+    .kpi-label {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
+
+    .alerts-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .alert-item {
+        padding: 12px 14px;
+        border-radius: 8px;
+    }
+
+    .low-stock {
+        background: #f8d7da;
+    }
+
+    .expiring-soon {
+        background: #fff3cd;
+    }
+
+    .alert-empty {
+        margin: 0;
+        color: var(--text-muted);
+    }
+
+    .chart-wrapper {
+        position: relative;
+        width: 100%;
+        min-height: 320px;
+        height: 320px;
+    }
+
+    .chart-wrapper canvas {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    th, td {
+        padding: 12px;
+        border: 1px solid var(--border);
+        text-align: left;
+    }
+
+    th {
+        background: var(--table-head);
+    }
+
+    @media (max-width: 992px) {
+        .kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 640px) {
+        .kpi-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .chart-wrapper {
+            min-height: 260px;
+            height: 260px;
+        }
+
+        table,
+        thead,
+        tbody,
+        th,
+        td,
+        tr {
+            display: block;
+        }
+
+        thead {
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+        }
+
+        tbody tr {
+            margin-bottom: 12px;
+            background: #fff;
+            border: 1px solid var(--border);
+        }
+
+        td {
+            border: none;
+            border-bottom: 1px solid #eee;
+            position: relative;
+            padding-left: 50%;
+        }
+
+        td:before {
+            position: absolute;
+            left: 12px;
+            top: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        td:nth-of-type(1):before {
+            content: "Date";
+        }
+
+        td:nth-of-type(2):before {
+            content: "Moving Avg";
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{{ chart_labels|json_script:"chart-labels" }}
+{{ chart_data|json_script:"chart-data" }}
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+    <div class="dashboard-header">
+        <h1>Vet System Dashboard</h1>
+    </div>
+
+    <section class="dashboard-section">
+        <h2 class="section-title">Business Overview</h2>
+        <div class="kpi-grid">
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ total_sales }}</p>
+                <p class="kpi-label">Total Sales (Excl VAT)</p>
+            </div>
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ gross_profit }}</p>
+                <p class="kpi-label">Gross Profit</p>
+            </div>
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ net_profit }}</p>
+                <p class="kpi-label">Net Profit (After VAT)</p>
+            </div>
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ total_vat }}</p>
+                <p class="kpi-label">Total VAT Collected</p>
+            </div>
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ total_stock_value }}</p>
+                <p class="kpi-label">Total Stock Value</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="dashboard-section card">
+        <h2 class="section-title">Low Stock Alerts</h2>
+        <div class="alerts-list">
+            {% if low_stock_products %}
+                {% for item in low_stock_products %}
+                    <div class="alert-item low-stock">
+                        {{ item.product.name }} - Remaining stock: {{ item.current_qty }}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="alert-empty">No low stock products.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="dashboard-section card">
+        <h2 class="section-title">Expiry Alerts (Next 180 Days)</h2>
+        <div class="alerts-list">
+            {% if expiry_alerts %}
+                {% for item in expiry_alerts %}
+                    <div class="alert-item expiring-soon">
+                        {{ item.product.name }} - Expiry date: {{ item.expiry_date }}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="alert-empty">No products expiring soon.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="dashboard-section card">
+        <h2 class="section-title">Top 10 Products by Quantity Sold</h2>
+        <div class="chart-wrapper">
+            <canvas id="topProductsChart"></canvas>
+        </div>
+    </section>
+
+    <section class="dashboard-section card">
+        <h2 class="section-title">Sales Forecast (7-day Moving Average)</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Moving Avg</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if sales_forecast %}
+                        {% for row in sales_forecast %}
+                            <tr>
+                                <td>{{ row.date }}</td>
+                                <td>{{ row.moving_avg }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td>No data</td>
+                            <td>0.00</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block footer %}
+{{ block.super }}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const labelsNode = document.getElementById("chart-labels");
+    const dataNode = document.getElementById("chart-data");
+    const canvas = document.getElementById("topProductsChart");
+
+    if (!labelsNode || !dataNode || !canvas) return;
+
+    const labels = JSON.parse(labelsNode.textContent || "[]");
+    const data = JSON.parse(dataNode.textContent || "[]");
+
+    if (!labels.length || !data.length) return;
+
+    new Chart(canvas.getContext("2d"), {
+        type: "bar",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Quantity Sold",
+                data: data,
+                backgroundColor: "rgba(54, 162, 235, 0.6)",
+                borderColor: "rgba(54, 162, 235, 1)",
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        autoSkip: false,
+                        maxRotation: 45,
+                        minRotation: 0
+                    }
+                },
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
