@@ -1,86 +1,37 @@
 from decimal import Decimal
 from datetime import timedelta
 
+from django.db.models import Sum
+
 from django.shortcuts import render
 from django.utils import timezone
-from django.db.models import Sum, F, FloatField, Case, When
 
+from landing.models import Shipment, ShipmentItem
 from products.models import Product
 from sales.models import Sale
-from inventory.models import StockLedger
-from landing.models import Shipment
 
 
 def dashboard_view(request):
     sales = Sale.objects.select_related("product").all()
     products = Product.objects.all()
 
-    # KPI calculations
-    total_sales = Decimal("0.00")
-    total_vat = Decimal("0.00")
-    gross_profit = Decimal("0.00")
+    total_sales = sum((sale.get_line_total() or Decimal("0.00")) for sale in sales)
+    total_vat = sum((sale.get_vat_amount() or Decimal("0.00")) for sale in sales)
+    gross_profit = sum((sale.get_gross_profit() or Decimal("0.00")) for sale in sales)
+    net_profit = sum((sale.get_net_profit() or Decimal("0.00")) for sale in sales)
 
-    for sale in sales:
-        total_sales += sale.get_line_total() or Decimal("0.00")
-        total_vat += sale.get_vat_amount() or Decimal("0.00")
-
-        try:
-            gross_profit += sale.get_profit() or Decimal("0.00")
-        except AttributeError:
-            pass
-        except TypeError:
-            pass
-
-    net_profit = gross_profit - total_vat
-
-    # Stock summary by product
-    stock_summary_qs = StockLedger.objects.values("product").annotate(
-        qty_in=Sum(
-            Case(
-                When(movement_type="IN", then=F("quantity")),
-                default=0,
-                output_field=FloatField(),
-            )
-        ),
-        qty_out=Sum(
-            Case(
-                When(movement_type="OUT", then=F("quantity")),
-                default=0,
-                output_field=FloatField(),
-            )
-        ),
+    # Most accurate stock value for your FIFO system:
+    # remaining quantity * landed unit cost per shipment item
+    total_stock_value = sum(
+        (Decimal(item.quantity_remaining or 0) * Decimal(item.unit_landed_cost or 0))
+        for item in ShipmentItem.objects.filter(quantity_remaining__gt=0)
     )
 
-    stock_summary = {
-        item["product"]: {
-            "qty_in": item["qty_in"] or 0,
-            "qty_out": item["qty_out"] or 0,
-        }
-        for item in stock_summary_qs
-    }
-
-    total_stock_value = Decimal("0.00")
     low_stock_products = []
-
     for product in products:
-        summary = stock_summary.get(product.id, {"qty_in": 0, "qty_out": 0})
-        current_qty = summary["qty_in"] - summary["qty_out"]
-
-        latest_entry = (
-            StockLedger.objects.filter(product=product)
-            .order_by("-created_at")
-            .first()
-        )
-
-        unit_cost = (
-            latest_entry.unit_cost
-            if latest_entry and latest_entry.unit_cost
-            else Decimal("0.00")
-        )
-
-        total_stock_value += Decimal(str(current_qty)) * unit_cost
-
+        current_qty = product.get_current_stock()
         reorder_level = product.reorder_level or 0
+
         if current_qty <= reorder_level:
             low_stock_products.append(
                 {
@@ -89,18 +40,17 @@ def dashboard_view(request):
                 }
             )
 
-    # Expiry alerts
     expiry_limit = timezone.now().date() + timedelta(days=180)
     expiry_alerts = (
-        StockLedger.objects.select_related("product")
+        ShipmentItem.objects.select_related("product")
         .filter(
             expiry_date__isnull=False,
             expiry_date__lte=expiry_limit,
+            quantity_remaining__gt=0,
         )
         .order_by("expiry_date")
     )
 
-    # Top selling products
     top_products = (
         Sale.objects.values("product__name")
         .annotate(total_qty=Sum("quantity"))
@@ -110,7 +60,6 @@ def dashboard_view(request):
     chart_labels = [item["product__name"] or "Unnamed Product" for item in top_products]
     chart_data = [float(item["total_qty"] or 0) for item in top_products]
 
-    # Sales forecast
     last_30_sales = list(Sale.objects.order_by("-sale_date")[:30])[::-1]
     sales_forecast = []
 
@@ -146,7 +95,11 @@ def vat_report_view(request):
     shipments = Shipment.objects.all()
 
     output_vat = sum((sale.get_vat_amount() or Decimal("0.00")) for sale in sales)
-    input_vat = sum((shipment.custom_duty_tax or Decimal("0.00")) for shipment in shipments)
+
+    # No true input VAT field exists in Shipment yet.
+    # Keep this zero until you add a proper input VAT column.
+    input_vat = Decimal("0.00")
+
     vat_payable = output_vat - input_vat
 
     context = {
