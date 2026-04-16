@@ -2,7 +2,6 @@ from decimal import Decimal
 from datetime import timedelta
 
 from django.db.models import Sum
-
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -12,7 +11,7 @@ from sales.models import Sale
 
 
 def dashboard_view(request):
-    sales = Sale.objects.select_related("product").all()
+    sales = Sale.objects.filter(status=Sale.STATUS_APPROVED).select_related("product")
     products = Product.objects.all()
 
     total_sales = sum((sale.get_line_total() or Decimal("0.00")) for sale in sales)
@@ -20,8 +19,6 @@ def dashboard_view(request):
     gross_profit = sum((sale.get_gross_profit() or Decimal("0.00")) for sale in sales)
     net_profit = sum((sale.get_net_profit() or Decimal("0.00")) for sale in sales)
 
-    # Most accurate stock value for your FIFO system:
-    # remaining quantity * landed unit cost per shipment item
     total_stock_value = sum(
         (Decimal(item.quantity_remaining or 0) * Decimal(item.unit_landed_cost or 0))
         for item in ShipmentItem.objects.filter(quantity_remaining__gt=0)
@@ -52,7 +49,8 @@ def dashboard_view(request):
     )
 
     top_products = (
-        Sale.objects.values("product__name")
+        Sale.objects.filter(status=Sale.STATUS_APPROVED)
+        .values("product__name")
         .annotate(total_qty=Sum("quantity"))
         .order_by("-total_qty")[:10]
     )
@@ -60,7 +58,9 @@ def dashboard_view(request):
     chart_labels = [item["product__name"] or "Unnamed Product" for item in top_products]
     chart_data = [float(item["total_qty"] or 0) for item in top_products]
 
-    last_30_sales = list(Sale.objects.order_by("-sale_date")[:30])[::-1]
+    last_30_sales = list(
+        Sale.objects.filter(status=Sale.STATUS_APPROVED).order_by("-sale_date")[:30]
+    )[::-1]
     sales_forecast = []
 
     for index, sale in enumerate(last_30_sales):
@@ -91,15 +91,12 @@ def dashboard_view(request):
 
 
 def vat_report_view(request):
-    sales = Sale.objects.all()
+    sales = Sale.objects.filter(status=Sale.STATUS_APPROVED)
     shipments = Shipment.objects.all()
 
     output_vat = sum((sale.get_vat_amount() or Decimal("0.00")) for sale in sales)
 
-    # No true input VAT field exists in Shipment yet.
-    # Keep this zero until you add a proper input VAT column.
     input_vat = Decimal("0.00")
-
     vat_payable = output_vat - input_vat
 
     context = {

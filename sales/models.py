@@ -1,7 +1,9 @@
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from products.models import Product
 from landing.models import ShipmentItem
@@ -9,9 +11,20 @@ from landing.models import ShipmentItem
 
 DEFAULT_WHT_PERCENT = Decimal("2.0")
 WHT_THRESHOLD_ETB = Decimal("10000.00")
+User = get_user_model()
 
 
 class Sale(models.Model):
+    STATUS_PENDING = "PENDING"
+    STATUS_APPROVED = "APPROVED"
+    STATUS_REJECTED = "REJECTED"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_APPROVED, "Approved"),
+        (STATUS_REJECTED, "Rejected"),
+    ]
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
 
@@ -30,10 +43,28 @@ class Sale(models.Model):
 
     sale_date = models.DateTimeField(auto_now_add=True)
 
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="sales_requested",
+    )
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="sales_approved",
+    )
+    approved_at = models.DateTimeField(blank=True, null=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    stock_applied = models.BooleanField(default=False)
+
     _unit_cost = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
     _cost_total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
 
-    # Store the first FIFO-consumed batch details for ledger/admin reporting
     consumed_batch_number = models.CharField(max_length=100, blank=True, null=True)
     consumed_expiry_date = models.DateField(blank=True, null=True)
 
@@ -41,7 +72,7 @@ class Sale(models.Model):
         ordering = ["-sale_date"]
 
     def __str__(self):
-        return f"{self.product.name} - {self.quantity} sold to {self.customer_name or 'Walk-in'}"
+        return f"{self.product.name} - {self.quantity} for {self.customer_name or 'Walk-in'} [{self.status}]"
 
     def _consume_fifo_stock(self):
         remaining_qty = self.quantity or 0
@@ -83,6 +114,52 @@ class Sale(models.Model):
         self.consumed_batch_number = first_batch_number
         self.consumed_expiry_date = first_expiry_date
 
+    def approve(self, user=None):
+        if self.stock_applied and self.status == self.STATUS_APPROVED:
+            return
+
+        self._consume_fifo_stock()
+        self.status = self.STATUS_APPROVED
+        self.stock_applied = True
+        self.approved_at = timezone.now()
+        self.rejection_reason = ""
+
+        if user is not None and getattr(user, "is_authenticated", False):
+            self.approved_by = user
+
+        self.wht_amount = self.calculate_wht_amount()
+
+        self.save(update_fields=[
+            "status",
+            "stock_applied",
+            "approved_at",
+            "approved_by",
+            "rejection_reason",
+            "_cost_total",
+            "_unit_cost",
+            "consumed_batch_number",
+            "consumed_expiry_date",
+            "wht_amount",
+        ])
+
+    def reject(self, user=None, reason=""):
+        if self.stock_applied:
+            raise ValidationError("Approved sales cannot be rejected directly. Create a return/adjustment workflow instead.")
+
+        self.status = self.STATUS_REJECTED
+        self.approved_at = timezone.now()
+
+        if user is not None and getattr(user, "is_authenticated", False):
+            self.approved_by = user
+
+        self.rejection_reason = reason or self.rejection_reason or ""
+        self.save(update_fields=[
+            "status",
+            "approved_at",
+            "approved_by",
+            "rejection_reason",
+        ])
+
     def save(self, *args, **kwargs):
         if not self.unit_price or self.unit_price == 0:
             if hasattr(self.product, "get_final_selling_price"):
@@ -90,21 +167,11 @@ class Sale(models.Model):
             else:
                 self.unit_price = self.product.selling_price or Decimal("0.00")
 
-        if not self.pk:
-            self._consume_fifo_stock()
-
         self.wht_amount = self.calculate_wht_amount()
         super().save(*args, **kwargs)
 
     def get_batch_number(self):
-        if self.consumed_batch_number:
-            return self.consumed_batch_number
-
-        batch = ShipmentItem.objects.filter(
-            product=self.product,
-            quantity_remaining__gt=0
-        ).order_by("expiry_date", "id").first()
-        return batch.batch_number if batch else ""
+        return self.consumed_batch_number or ""
     get_batch_number.short_description = "Batch"
 
     def get_unit(self):

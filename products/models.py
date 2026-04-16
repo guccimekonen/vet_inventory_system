@@ -34,9 +34,13 @@ class Product(models.Model):
     def get_total_purchased(self) -> int:
         return sum(p.quantity or 0 for p in self.purchase_set.all())
 
+    
     def get_total_sold(self) -> int:
         from sales.models import Sale
-        return sum(s.quantity or 0 for s in Sale.objects.filter(product=self))
+        return sum(
+            s.quantity or 0
+            for s in Sale.objects.filter(product=self, status=Sale.STATUS_APPROVED)
+        )
 
     def get_supplier_unit_cost_usd(self) -> Decimal:
         return (self.unit_cost or Decimal("0.00")).quantize(Decimal("0.0001"))
