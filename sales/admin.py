@@ -120,7 +120,13 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
         "approved_at",
     )
 
-    search_fields = ("product__name", "product__sku", "customer_name", "requested_by__username", "approved_by__username")
+    search_fields = (
+        "product__name",
+        "product__sku",
+        "customer_name",
+        "requested_by__username",
+        "approved_by__username",
+    )
     list_filter = ("status", "sale_date", "product", "requested_by", "approved_by")
     actions = ("approve_selected_sales", "reject_selected_sales")
 
@@ -255,7 +261,11 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
                 self.message_user(request, f"Sale #{sale.id}: {e}", level=messages.ERROR)
 
         if approved_count:
-            self.message_user(request, f"{approved_count} sale(s) approved successfully.", level=messages.SUCCESS)
+            self.message_user(
+                request,
+                f"{approved_count} sale(s) approved successfully.",
+                level=messages.SUCCESS,
+            )
 
     @admin.action(description="Reject selected sales")
     def reject_selected_sales(self, request, queryset):
@@ -277,12 +287,22 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
                 self.message_user(request, f"Sale #{sale.id}: {e}", level=messages.ERROR)
 
         if rejected_count:
-            self.message_user(request, f"{rejected_count} sale(s) rejected successfully.", level=messages.SUCCESS)
+            self.message_user(
+                request,
+                f"{rejected_count} sale(s) rejected successfully.",
+                level=messages.SUCCESS,
+            )
 
     def save_model(self, request, obj, form, change):
         previous = Sale.objects.get(pk=obj.pk) if change else None
         requested_status = obj.status
         approver = self.user_can_approve(request.user)
+
+        if not obj.status:
+            obj.status = Sale.STATUS_PENDING
+
+        if obj.stock_applied is None:
+            obj.stock_applied = False
 
         if not obj.requested_by_id:
             obj.requested_by = request.user
