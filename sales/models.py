@@ -167,6 +167,12 @@ class Sale(models.Model):
             else:
                 self.unit_price = self.product.selling_price or Decimal("0.00")
 
+        if not self.status:
+            self.status = self.STATUS_PENDING
+
+        if self.stock_applied is None:
+            self.stock_applied = False
+
         self.wht_amount = self.calculate_wht_amount()
         super().save(*args, **kwargs)
 
