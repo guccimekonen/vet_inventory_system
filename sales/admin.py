@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from import_export.admin import ExportMixin
@@ -8,6 +9,36 @@ from dashboard.admin import custom_admin_site
 
 
 APPROVER_GROUP_NAMES = {"Admin", "Manager", "Sales Manager"}
+
+
+class SaleAdminForm(forms.ModelForm):
+    class Meta:
+        model = Sale
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop("request", None)
+        super().__init__(*args, **kwargs)
+
+        if self.request is not None:
+            can_approve = (
+                self.request.user.is_superuser
+                or self.request.user.groups.filter(name__in=APPROVER_GROUP_NAMES).exists()
+            )
+
+            if not can_approve and "status" in self.fields:
+                self.fields.pop("status")
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        if "status" not in cleaned_data or not cleaned_data.get("status"):
+            cleaned_data["status"] = Sale.STATUS_PENDING
+
+        if "stock_applied" not in cleaned_data or cleaned_data.get("stock_applied") is None:
+            cleaned_data["stock_applied"] = False
+
+        return cleaned_data
 
 
 class SaleResource(resources.ModelResource):
@@ -104,6 +135,7 @@ class SaleResource(resources.ModelResource):
 
 class SaleAdmin(ExportMixin, admin.ModelAdmin):
     resource_class = SaleResource
+    form = SaleAdminForm
 
     list_display = (
         "product",
@@ -199,6 +231,16 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
             )
         }),
     )
+
+    def get_form(self, request, obj=None, **kwargs):
+        base_form = super().get_form(request, obj, **kwargs)
+
+        class RequestAwareSaleAdminForm(base_form):
+            def __new__(cls, *args, **inner_kwargs):
+                inner_kwargs["request"] = request
+                return base_form(*args, **inner_kwargs)
+
+        return RequestAwareSaleAdminForm
 
     def user_can_approve(self, user):
         return user.is_superuser or user.groups.filter(name__in=APPROVER_GROUP_NAMES).exists()
@@ -306,11 +348,8 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
         requested_status = obj.status
         approver = self.user_can_approve(request.user)
 
-        if not obj.status:
-            obj.status = Sale.STATUS_PENDING
-
-        if obj.stock_applied is None:
-            obj.stock_applied = False
+        obj.status = obj.status or Sale.STATUS_PENDING
+        obj.stock_applied = False if obj.stock_applied is None else obj.stock_applied
 
         if not obj.requested_by_id:
             obj.requested_by = request.user
