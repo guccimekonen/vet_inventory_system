@@ -52,6 +52,12 @@
         gap: var(--gap);
     }
 
+    .kpi-grid-extended {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--gap);
+    }
+
     .kpi-box {
         text-align: center;
     }
@@ -126,13 +132,15 @@
     }
 
     @media (max-width: 992px) {
-        .kpi-grid {
+        .kpi-grid,
+        .kpi-grid-extended {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
     }
 
     @media (max-width: 640px) {
-        .kpi-grid {
+        .kpi-grid,
+        .kpi-grid-extended {
             grid-template-columns: 1fr;
         }
 
@@ -223,6 +231,40 @@
             <div class="card kpi-box">
                 <p class="kpi-value">{{ total_stock_value }}</p>
                 <p class="kpi-label">Total Stock Value</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="dashboard-section">
+        <h2 class="section-title">Projected Import Profit</h2>
+        <div class="kpi-grid-extended">
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ projected_sales_value }}</p>
+                <p class="kpi-label">Projected Sales Value</p>
+            </div>
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ total_import_cost }}</p>
+                <p class="kpi-label">Total Import Cost</p>
+            </div>
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ projected_profit_before_tax }}</p>
+                <p class="kpi-label">Projected Profit Before Tax</p>
+            </div>
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ projected_profit_percent }}%</p>
+                <p class="kpi-label">Projected Profit %</p>
+            </div>
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ profit_tax_percent }}%</p>
+                <p class="kpi-label">Profit Tax Rate</p>
+            </div>
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ profit_tax_payable }}</p>
+                <p class="kpi-label">Profit Tax Payable</p>
+            </div>
+            <div class="card kpi-box">
+                <p class="kpi-value">{{ projected_profit_after_tax }}</p>
+                <p class="kpi-label">Projected Profit After Tax</p>
             </div>
         </div>
     </section>
@@ -347,3 +389,4 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 </script>
 {% endblock %}
+
