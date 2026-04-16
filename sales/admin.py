@@ -239,6 +239,14 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
 
         return tuple(dict.fromkeys(readonly))
 
+    def get_exclude(self, request, obj=None):
+        exclude = list(super().get_exclude(request, obj) or [])
+
+        if not self.user_can_approve(request.user):
+            exclude.append("status")
+
+        return tuple(dict.fromkeys(exclude))
+
     def get_actions(self, request):
         actions = super().get_actions(request)
         if not self.user_can_approve(request.user):
@@ -309,19 +317,18 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
 
         try:
             if not change:
-                if not approver:
-                    obj.status = Sale.STATUS_PENDING
+                obj.status = Sale.STATUS_PENDING if not approver else (obj.status or Sale.STATUS_PENDING)
                 obj.save()
                 self.message_user(request, "Sale request saved successfully.", level=messages.SUCCESS)
                 return
 
             if not approver:
-                obj.status = previous.status
+                obj.status = previous.status or Sale.STATUS_PENDING
                 obj.save()
                 self.message_user(request, "Sale request updated.", level=messages.SUCCESS)
                 return
 
-            obj.status = previous.status
+            obj.status = previous.status or Sale.STATUS_PENDING
             obj.save()
 
             if requested_status != previous.status:
