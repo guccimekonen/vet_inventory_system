@@ -68,6 +68,45 @@
     min-width: 1200px;
 }
 
+.main.shifted > #nav-sidebar,
+#nav-sidebar {
+    width: 340px;
+    min-width: 340px;
+}
+
+#nav-sidebar .module th,
+#nav-sidebar .module td {
+    white-space: nowrap;
+}
+
+#nav-sidebar .module td a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 72px;
+}
+
+.change-list th.column-compact_product,
+.change-list td.field-compact_product {
+    width: 170px;
+    max-width: 170px;
+    white-space: normal;
+    vertical-align: top;
+}
+
+.change-list .compact-product-cell {
+    display: inline-block;
+    max-width: 150px;
+    line-height: 1.2;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.change-list .compact-product-cell strong,
+.change-list .compact-product-cell span {
+    display: block;
+}
+
 @media (max-width: 1200px) {
     .change-list #changelist {
         grid-template-columns: 1fr;

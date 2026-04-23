@@ -169,7 +169,7 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
             return "-"
 
         return format_html(
-            "<strong>{}</strong><br>{}",
+            '<div class="compact-product-cell"><strong>{}</strong><br><span>{}</span></div>',
             obj.product.sku or "-",
             obj.product.name or "-",
         )
