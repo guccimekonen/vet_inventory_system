@@ -142,6 +142,13 @@ class ShipmentAdmin(ExportMixin, admin.ModelAdmin):
         "created_at",
     )
 
+    search_fields = ("reference",)
+
+    list_filter = (
+        "created_at",
+        "custom_duty_percent",
+    )
+
     inlines = [ShipmentItemInline]
 
     readonly_fields = (
@@ -232,6 +239,18 @@ class ShipmentItemAdmin(ExportMixin, admin.ModelAdmin):
         "unit_landed_cost",
         "get_selling_price",
         "quantity_remaining",
+    )
+
+    search_fields = (
+        "shipment__reference",
+        "product__name",
+        "batch_number",
+    )
+
+    list_filter = (
+        "shipment",
+        "product",
+        "expiry_date",
     )
 
     readonly_fields = (

@@ -66,6 +66,19 @@ class ProductAdmin(ExportMixin, admin.ModelAdmin):
         "created_at",
     )
 
+    search_fields = (
+        "sku",
+        "name",
+        "batch_number",
+        "hs_code",
+    )
+
+    list_filter = (
+        "controlled",
+        "unit_of_measure",
+        "created_at",
+    )
+
     readonly_fields = (
         "get_current_stock",
         "get_landed_unit_cost_birr",
