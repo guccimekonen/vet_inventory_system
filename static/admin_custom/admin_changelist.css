@@ -18,7 +18,7 @@
 
 .change-list #changelist {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr) 260px;
     gap: 10px;
     align-items: start;
 }
@@ -34,6 +34,7 @@
     grid-column: 2;
     float: none;
     width: 100%;
+    max-width: 260px;
     margin: -8px 0 16px;
     box-sizing: border-box;
 }
@@ -42,6 +43,7 @@
     grid-column: 2;
     float: none;
     width: 100%;
+    max-width: 260px;
     margin: 0;
     position: sticky;
     top: 12px;
@@ -54,13 +56,13 @@
     background: var(--darkened-bg, #1f1f1f);
     border: 1px solid var(--hairline-color, #333);
     border-radius: 10px;
-    padding: 16px;
+    padding: 12px;
 }
 
 .change-list #toolbar form {
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 10px;
+    grid-template-columns: 1fr;
+    gap: 8px;
     align-items: center;
 }
 
@@ -84,7 +86,7 @@
 }
 
 .change-list table {
-    min-width: 860px;
+    min-width: 760px;
     width: max-content;
     max-width: 100%;
 }
