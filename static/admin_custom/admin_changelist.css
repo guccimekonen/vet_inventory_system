@@ -16,6 +16,43 @@
     max-width: 100%;
 }
 
+#content-main.app-list {
+    min-width: 0;
+    overflow-x: hidden;
+}
+
+#content-main.app-list table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+#content-main.app-list col:first-child {
+    width: auto;
+}
+
+#content-main.app-list col.action-checkbox-column,
+#content-main.app-list col:nth-child(2),
+#content-main.app-list col:nth-child(3) {
+    width: 96px;
+}
+
+#content-main.app-list td,
+#content-main.app-list th {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#content-main.app-list td.model,
+#content-main.app-list th {
+    white-space: nowrap;
+}
+
+#content-main.app-list td.addlink,
+#content-main.app-list td.changelink {
+    white-space: nowrap;
+    text-align: right;
+}
+
 .change-list #changelist {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 260px;
