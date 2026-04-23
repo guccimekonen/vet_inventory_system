@@ -1,0 +1,83 @@
+.change-list #changelist {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 24px;
+    align-items: start;
+}
+
+.change-list #changelist-form {
+    grid-column: 1;
+    min-width: 0;
+}
+
+.change-list #toolbar {
+    grid-column: 2;
+    float: none;
+    width: 100%;
+    margin: 0 0 16px;
+    box-sizing: border-box;
+}
+
+.change-list #changelist-filter {
+    grid-column: 2;
+    float: none;
+    width: 100%;
+    margin: 0;
+    position: sticky;
+    top: 20px;
+    align-self: start;
+    box-sizing: border-box;
+}
+
+.change-list #toolbar,
+.change-list #changelist-filter {
+    background: var(--darkened-bg, #1f1f1f);
+    border: 1px solid var(--hairline-color, #333);
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.change-list #toolbar form {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.change-list #toolbar input[type="text"] {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.change-list .results {
+    overflow-x: auto;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    scrollbar-width: thin;
+}
+
+.change-list .results.dragging {
+    cursor: grabbing;
+}
+
+.change-list table {
+    min-width: 1200px;
+}
+
+@media (max-width: 1200px) {
+    .change-list #changelist {
+        grid-template-columns: 1fr;
+    }
+
+    .change-list #toolbar,
+    .change-list #changelist-filter,
+    .change-list #changelist-form {
+        grid-column: 1;
+    }
+
+    .change-list #changelist-filter {
+        position: static;
+    }
+}
