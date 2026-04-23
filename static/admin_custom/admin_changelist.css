@@ -16,7 +16,7 @@
 }
 
 .change-list #content {
-    padding: 16px 20px;
+    padding: 12px 14px;
 }
 
 .main > .content,
@@ -41,13 +41,15 @@
 #content-main.app-list col.action-checkbox-column,
 #content-main.app-list col:nth-child(2),
 #content-main.app-list col:nth-child(3) {
-    width: 96px;
+    width: 72px;
 }
 
 #content-main.app-list td,
 #content-main.app-list th {
     overflow: hidden;
     text-overflow: ellipsis;
+    padding-left: 12px;
+    padding-right: 12px;
 }
 
 #content-main.app-list td.model,
@@ -63,8 +65,8 @@
 
 .change-list #changelist {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 220px;
-    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) 180px;
+    gap: 6px;
     align-items: start;
 }
 
@@ -79,7 +81,7 @@
     grid-column: 2;
     float: none;
     width: 100%;
-    max-width: 220px;
+    max-width: 180px;
     margin: -8px 0 16px;
     box-sizing: border-box;
 }
@@ -88,7 +90,7 @@
     grid-column: 2;
     float: none;
     width: 100%;
-    max-width: 220px;
+    max-width: 180px;
     margin: 0;
     position: sticky;
     top: 12px;
@@ -101,7 +103,7 @@
     background: var(--darkened-bg, #1f1f1f);
     border: 1px solid var(--hairline-color, #333);
     border-radius: 10px;
-    padding: 12px;
+    padding: 10px;
 }
 
 .change-list #toolbar form {
@@ -140,15 +142,15 @@
 
 .main.shifted > #nav-sidebar,
 #nav-sidebar {
-    flex: 0 0 275px;
-    width: 275px;
-    min-width: 275px;
-    left: -276px;
-    margin-left: -276px;
+    flex: 0 0 255px;
+    width: 255px;
+    min-width: 255px;
+    left: -256px;
+    margin-left: -256px;
 }
 
 .main.shifted > #nav-sidebar + .content {
-    max-width: calc(100% - 299px);
+    max-width: calc(100% - 279px);
 }
 
 .change-list th.column-compact_product,
