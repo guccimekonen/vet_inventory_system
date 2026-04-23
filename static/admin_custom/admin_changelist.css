@@ -8,8 +8,8 @@
 .change-list #changelist-form {
     grid-column: 1;
     min-width: 0;
-    margin-top: 26px;
-    margin-left: -26px;
+    margin-top: 18px;
+    margin-left: 0;
 }
 
 .change-list #toolbar {
@@ -58,6 +58,7 @@
     user-select: none;
     -webkit-user-select: none;
     scrollbar-width: thin;
+    max-width: 100%;
 }
 
 .change-list .results.dragging {
@@ -65,13 +66,15 @@
 }
 
 .change-list table {
-    min-width: 1200px;
+    min-width: 980px;
+    width: max-content;
+    max-width: 100%;
 }
 
 .main.shifted > #nav-sidebar,
 #nav-sidebar {
-    width: 340px;
-    min-width: 340px;
+    width: 260px;
+    min-width: 260px;
 }
 
 #nav-sidebar .module th,
@@ -83,7 +86,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
-    min-width: 72px;
+    min-width: 58px;
 }
 
 .change-list th.column-compact_product,
