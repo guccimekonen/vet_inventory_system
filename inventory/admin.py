@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib import admin
+from django.utils.html import format_html
 from import_export.admin import ExportMixin
 from import_export import resources, fields
 
@@ -37,7 +38,7 @@ class StockLedgerAdmin(ExportMixin, admin.ModelAdmin):
     resource_class = StockLedgerResource
 
     list_display = (
-        "product",
+        "compact_product",
         "batch_number",
         "expiry_date",
         "movement_type",
@@ -50,6 +51,17 @@ class StockLedgerAdmin(ExportMixin, admin.ModelAdmin):
     list_filter = ("movement_type", "product")
     search_fields = ("product__name", "batch_number", "reference")
     readonly_fields = ("total_cost", "created_at")
+
+    @admin.display(description="Product", ordering="product__sku")
+    def compact_product(self, obj):
+        if not obj.product:
+            return "-"
+
+        return format_html(
+            "<strong>{}</strong><br>{}",
+            obj.product.sku or "-",
+            obj.product.name or "-",
+        )
 
     def unit_cost_display(self, obj):
         return obj.unit_cost or Decimal("0.00")

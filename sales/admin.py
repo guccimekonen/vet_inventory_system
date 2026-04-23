@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
+from django.utils.html import format_html
 from import_export.admin import ExportMixin
 from import_export import resources, fields
 
@@ -138,7 +139,7 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
     form = SaleAdminForm
 
     list_display = (
-        "product",
+        "compact_product",
         "status",
         "requested_by",
         "approved_by",
@@ -161,6 +162,17 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
     )
     list_filter = ("status", "sale_date", "product", "requested_by", "approved_by")
     actions = ("approve_selected_sales", "reject_selected_sales")
+
+    @admin.display(description="Product", ordering="product__sku")
+    def compact_product(self, obj):
+        if not obj.product:
+            return "-"
+
+        return format_html(
+            "<strong>{}</strong><br>{}",
+            obj.product.sku or "-",
+            obj.product.name or "-",
+        )
 
     readonly_fields = (
         "requested_by",
