@@ -1,3 +1,21 @@
+#container {
+    min-width: 0;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+#container > .main,
+.main > .content,
+#content,
+#content-main {
+    min-width: 0;
+}
+
+.main > .content,
+.main.shifted > #nav-sidebar + .content {
+    max-width: 100%;
+}
+
 .change-list #changelist {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 300px;
@@ -66,15 +84,18 @@
 }
 
 .change-list table {
-    min-width: 980px;
+    min-width: 860px;
     width: max-content;
     max-width: 100%;
 }
 
 .main.shifted > #nav-sidebar,
 #nav-sidebar {
-    width: 260px;
-    min-width: 260px;
+    flex: 0 0 235px;
+    width: 235px;
+    min-width: 235px;
+    left: -236px;
+    margin-left: -236px;
 }
 
 #nav-sidebar .module th,
@@ -87,6 +108,10 @@
     align-items: center;
     justify-content: flex-end;
     min-width: 58px;
+}
+
+.main.shifted > #nav-sidebar + .content {
+    max-width: calc(100% - 259px);
 }
 
 .change-list th.column-compact_product,
