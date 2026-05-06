@@ -1,11 +1,15 @@
-# vet_system/settings.py
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-^76x!n=u!om1^*6r6)4_=&^nbz$90g2tz%5@7m&o+mkfxxw&!a'
 DEBUG = True
-ALLOWED_HOSTS = []
+
+ALLOWED_HOSTS = [
+    "gutumekonen2026.pythonanywhere.com",
+    "localhost",
+    "127.0.0.1",
+]
 
 INSTALLED_APPS = [
     # Django core
@@ -78,10 +82,9 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files settings
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATIC_ROOT = BASE_DIR / "staticfiles"  # ✅ Required for collectstatic
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CRISPY_TEMPLATE_PACK = 'bootstrap5'
