@@ -137,10 +137,20 @@ class ShipmentItem(models.Model):
         return self.unit_landed_cost * Decimal("1.30")
 
     def save(self, *args, **kwargs):
+        update_fields = set(kwargs.get("update_fields") or [])
+
         if self.quantity_remaining is None:
             self.quantity_remaining = self.quantity
 
         self.fob_value = self.get_fob_value()
+
+        if update_fields:
+            if update_fields == {"quantity_remaining"}:
+                super().save(*args, **kwargs)
+                return
+
+            kwargs["update_fields"] = list(update_fields | {"fob_value"})
+
         super().save(*args, **kwargs)
 
         shipment = self.shipment

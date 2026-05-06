@@ -2,7 +2,8 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
+from django.db.models import F
 from django.utils import timezone
 
 from products.models import Product
@@ -75,44 +76,90 @@ class Sale(models.Model):
         return f"{self.product.name} - {self.quantity} for {self.customer_name or 'Walk-in'} [{self.status}]"
 
     def _consume_fifo_stock(self):
-        remaining_qty = self.quantity or 0
+        if not self.pk:
+            raise ValidationError("Sale must be saved before stock can be allocated.")
+
+        remaining_qty = int(self.quantity or 0)
         total_cost = Decimal("0.00")
         first_batch_number = None
         first_expiry_date = None
+        allocation_rows = []
+        allocation_summaries = []
 
-        batches = ShipmentItem.objects.filter(
-            product=self.product,
-            quantity_remaining__gt=0
-        ).order_by("expiry_date", "id")
+        with transaction.atomic():
+            self.allocations.all().delete()
 
-        for batch in batches:
-            if remaining_qty <= 0:
-                break
-
-            available = batch.quantity_remaining or 0
-            take_qty = min(available, remaining_qty)
-
-            if first_batch_number is None:
-                first_batch_number = batch.batch_number
-                first_expiry_date = batch.expiry_date
-
-            batch.quantity_remaining = available - take_qty
-            batch.save(update_fields=["quantity_remaining"])
-
-            unit_cost = batch.unit_landed_cost or Decimal("0.00")
-            total_cost += Decimal(take_qty) * unit_cost
-
-            remaining_qty -= take_qty
-
-        if remaining_qty > 0:
-            raise ValidationError(
-                f"Not enough stock! Available: {self.product.get_current_stock()}, Trying to sell: {self.quantity}"
+            batches = (
+                ShipmentItem.objects.select_for_update()
+                .filter(product=self.product, quantity_remaining__gt=0)
+                .order_by("expiry_date", "id")
             )
+
+            for batch in batches:
+                if remaining_qty <= 0:
+                    break
+
+                available = int(batch.quantity_remaining or 0)
+                take_qty = min(available, remaining_qty)
+                if take_qty <= 0:
+                    continue
+
+                if first_batch_number is None:
+                    first_batch_number = batch.batch_number
+                    first_expiry_date = batch.expiry_date
+
+                ShipmentItem.objects.filter(pk=batch.pk).update(
+                    quantity_remaining=F("quantity_remaining") - take_qty
+                )
+
+                unit_cost = Decimal(batch.unit_landed_cost or Decimal("0.00"))
+                line_total = Decimal(take_qty) * unit_cost
+                total_cost += line_total
+
+                allocation_rows.append(
+                    SaleBatchAllocation(
+                        sale=self,
+                        shipment_item=batch,
+                        batch_number=batch.batch_number,
+                        expiry_date=batch.expiry_date,
+                        quantity=take_qty,
+                        unit_cost=unit_cost,
+                        total_cost=line_total,
+                    )
+                )
+                allocation_summaries.append(f"{batch.batch_number}({take_qty})")
+                remaining_qty -= take_qty
+
+            if remaining_qty > 0:
+                raise ValidationError(
+                    f"Not enough stock! Available: {self.product.get_current_stock()}, Trying to sell: {self.quantity}"
+                )
+
+            if allocation_rows:
+                SaleBatchAllocation.objects.bulk_create(allocation_rows)
 
         self._cost_total = total_cost
         self._unit_cost = (total_cost / self.quantity) if self.quantity > 0 else Decimal("0.00")
-        self.consumed_batch_number = first_batch_number
+        self.consumed_batch_number = ", ".join(allocation_summaries)
         self.consumed_expiry_date = first_expiry_date
+
+    def _restore_batch_allocations(self):
+        with transaction.atomic():
+            allocations = list(
+                self.allocations.select_related("shipment_item").order_by("-id")
+            )
+
+            for allocation in allocations:
+                ShipmentItem.objects.filter(pk=allocation.shipment_item_id).update(
+                    quantity_remaining=F("quantity_remaining") + allocation.quantity
+                )
+
+            self.allocations.all().delete()
+
+        self._cost_total = Decimal("0.00")
+        self._unit_cost = Decimal("0.00")
+        self.consumed_batch_number = ""
+        self.consumed_expiry_date = None
 
     def approve(self, user=None):
         if self.stock_applied and self.status == self.STATUS_APPROVED:
@@ -129,6 +176,29 @@ class Sale(models.Model):
 
         self.wht_amount = self.calculate_wht_amount()
 
+        self.save(update_fields=[
+            "status",
+            "stock_applied",
+            "approved_at",
+            "approved_by",
+            "rejection_reason",
+            "_cost_total",
+            "_unit_cost",
+            "consumed_batch_number",
+            "consumed_expiry_date",
+            "wht_amount",
+        ])
+
+    def move_to_pending(self):
+        if self.stock_applied:
+            self._restore_batch_allocations()
+
+        self.status = self.STATUS_PENDING
+        self.stock_applied = False
+        self.approved_at = None
+        self.approved_by = None
+        self.rejection_reason = ""
+        self.wht_amount = self.calculate_wht_amount()
         self.save(update_fields=[
             "status",
             "stock_applied",
@@ -175,6 +245,11 @@ class Sale(models.Model):
 
         self.wht_amount = self.calculate_wht_amount()
         super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.stock_applied:
+            self._restore_batch_allocations()
+        super().delete(*args, **kwargs)
 
     def get_batch_number(self):
         return self.consumed_batch_number or ""
@@ -239,3 +314,34 @@ class Sale(models.Model):
             return (self.get_net_profit() / total) * Decimal("100")
         return Decimal("0.00")
     get_margin_percent.short_description = "Margin %"
+
+
+class SaleBatchAllocation(models.Model):
+    sale = models.ForeignKey(
+        Sale,
+        on_delete=models.CASCADE,
+        related_name="allocations",
+    )
+    shipment_item = models.ForeignKey(
+        ShipmentItem,
+        on_delete=models.PROTECT,
+        related_name="sale_allocations",
+    )
+    batch_number = models.CharField(max_length=100)
+    expiry_date = models.DateField(blank=True, null=True)
+    quantity = models.PositiveIntegerField()
+    unit_cost = models.DecimalField(max_digits=20, decimal_places=4, default=Decimal("0.0000"))
+    total_cost = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sale", "shipment_item"],
+                name="unique_sale_shipment_item_allocation",
+            )
+        ]
+
+    def __str__(self):
+        return f"Sale #{self.sale_id} -> {self.batch_number} ({self.quantity})"

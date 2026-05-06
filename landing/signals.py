@@ -37,6 +37,7 @@ def create_or_update_stockledger_from_sale(sender, instance, created, **kwargs):
     """
     Only APPROVED sales create stock-out ledger entries.
     Pending/rejected sales do not affect stock ledger.
+    Batch-level allocations create one OUT row per consumed batch.
     """
     sale_reference = f"Sale #{instance.id}"
 
@@ -47,18 +48,39 @@ def create_or_update_stockledger_from_sale(sender, instance, created, **kwargs):
         ).delete()
         return
 
+    StockLedger.objects.filter(
+        movement_type="OUT",
+        reference=sale_reference,
+    ).delete()
+
+    allocations = list(instance.allocations.all())
+
+    if allocations:
+        StockLedger.objects.bulk_create([
+            StockLedger(
+                product=instance.product,
+                batch_number=allocation.batch_number,
+                expiry_date=allocation.expiry_date,
+                movement_type="OUT",
+                quantity=Decimal(allocation.quantity or 0),
+                unit_cost=Decimal(allocation.unit_cost or 0),
+                total_cost=Decimal(allocation.total_cost or 0),
+                reference=sale_reference,
+            )
+            for allocation in allocations
+        ])
+        return
+
     unit_cost = Decimal(instance._unit_cost or 0)
     quantity = Decimal(instance.quantity or 0)
 
-    StockLedger.objects.update_or_create(
+    StockLedger.objects.create(
         product=instance.product,
         batch_number=instance.consumed_batch_number or "",
+        expiry_date=instance.consumed_expiry_date,
         movement_type="OUT",
+        quantity=quantity,
+        unit_cost=unit_cost,
+        total_cost=unit_cost * quantity,
         reference=sale_reference,
-        defaults={
-            "expiry_date": instance.consumed_expiry_date,
-            "quantity": quantity,
-            "unit_cost": unit_cost,
-            "total_cost": unit_cost * quantity,
-        },
     )

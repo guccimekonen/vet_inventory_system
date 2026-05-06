@@ -390,10 +390,7 @@ class SaleAdmin(ExportMixin, admin.ModelAdmin):
                     obj.reject(request.user, obj.rejection_reason)
                     self.message_user(request, "Sale rejected.", level=messages.SUCCESS)
                 else:
-                    obj.status = Sale.STATUS_PENDING
-                    obj.approved_by = None
-                    obj.approved_at = None
-                    obj.save(update_fields=["status", "approved_by", "approved_at"])
+                    obj.move_to_pending()
                     self.message_user(request, "Sale moved back to pending.", level=messages.SUCCESS)
             else:
                 self.message_user(request, "Sale updated successfully.", level=messages.SUCCESS)
